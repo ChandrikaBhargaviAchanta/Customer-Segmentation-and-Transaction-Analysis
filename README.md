@@ -1,4 +1,4 @@
-# Customer-Segmentation-and-Transactions-Analysis  
+# Customer-Segmentation-and-Transaction-Analysis  
 
 
 
