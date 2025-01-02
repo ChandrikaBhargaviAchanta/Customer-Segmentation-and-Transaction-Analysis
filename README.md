@@ -4,6 +4,6 @@ Customer Segmentation and Retention Analysis is a data-driven project designed t
 # Key Features
 Data Preparation: Cleaning and transforming raw customer data.  
 Data Analysis: Exploratory analysis of customer demographics, transaction patterns, and revenue drivers.  
-Key Metrics Calculation: CAC, CLTV, AOV, and retention rates.  
+Key Metrics Calculation: CLTV, AOV, and retention rates.  
 Segmentation: Behavior-based (RFM) and demographic-based segmentation.  
 Insights for Visualization: Revenue trends, heatmaps, and demographic insights for dashboards.  
