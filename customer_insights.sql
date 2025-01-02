@@ -1,11 +1,11 @@
---STEP1: DATA PREPARATION 
+-- STEP1: DATA PREPARATION 
 -- Schema Creation 
 -- Create the Transactions table with the necessary fields
 CREATE TABLE Transactions (
     TransactionID VARCHAR(20) PRIMARY KEY, -- Unique ID for each transaction
     CustomerID VARCHAR(20), -- Unique ID for each customer
     CustomerDOB DATE, -- Customer's date of birth
-    CustGender VARCHAR(10), -- Gender of the customer
+    CustGender ENUM('Male', 'Female', 'Other'), -- Gender of the customer
     CustLocation VARCHAR(50), -- Customer's location
     CustAccountBalance DECIMAL(15, 2), -- Account balance of the customer
     TransactionDate DATE, -- Date of the transaction
@@ -13,7 +13,7 @@ CREATE TABLE Transactions (
     TransactionAmount DECIMAL(15, 2) -- Transaction amount in INR
 );
 
--- Data Cleaning 
+-- DATA CLEANING (Performed in Microsoft Excel)
 -- Insert cleaned data into the Transactions table from RawTransactions
 INSERT INTO Transactions
 SELECT
@@ -26,7 +26,7 @@ SELECT
         ELSE NULL
     END AS CustGender,
     CustLocation,
-    GREATEST(0, CustAccountBalance) AS CustAccountBalance, -- Ensure balance is non-negative
+    CustAccountBalance, -- Retain the original account balance for accurate analysis
     STR_TO_DATE(TransactionDate, '%d/%m/%Y') AS TransactionDate, -- Convert transaction date
     SEC_TO_TIME(TransactionTime) AS TransactionTime, -- Convert transaction time
     GREATEST(0, TransactionAmount) AS TransactionAmount -- Ensure transaction amount is non-negative
@@ -34,24 +34,15 @@ FROM RawTransactions
 WHERE CustomerID IS NOT NULL; -- Exclude records without CustomerID
 
 
+-- STEP2: DATA PROCESSING
 
---STEP2: DATA PROCESSING
--- (Adding Derived Fields)
---1. Calculate Customer Age 
 -- Add a column for customer age
 ALTER TABLE Transactions ADD COLUMN CustomerAge INT;
 -- Update age based on date of birth
 UPDATE Transactions
-SET CustomerAge = TIMESTAMPDIFF(YEAR, CustomerDOB, CURDATE());
+SET CustomerAge = TIMESTAMPDIFF(YEAR, CustomerDOB, CURDATE())
+WHERE CustomerDOB IS NOT NULL; -- Ensure DOB is non-null
 
---2. Add Transaction Year
--- Add a column for the year of the transaction
-ALTER TABLE Transactions ADD COLUMN TransactionYear INT;
--- Update the year field using the transaction date
-UPDATE Transactions
-SET TransactionYear = YEAR(TransactionDate);
-
---3. Add Age Groups
 -- Categorize customers into age groups for segmentation
 ALTER TABLE Transactions ADD COLUMN AgeGroup VARCHAR(20);
 -- Update age group based on age
@@ -65,89 +56,207 @@ SET AgeGroup = CASE
     ELSE 'Unknown'
 END;
 
+-- Add a column for the year of the transaction
+ALTER TABLE Transactions ADD COLUMN TransactionYear INT;
+-- Update the year field using the transaction date
+UPDATE Transactions
+SET TransactionYear = YEAR(TransactionDate)
+WHERE TransactionDate IS NOT NULL;
+
+-- Identify High-Risk Customers (Negative Balances): Tag customers with negative balances for further investigation
+-- Add a column to flag high-risk customers
+ALTER TABLE Transactions ADD COLUMN IsHighRisk BOOLEAN;
+-- Update the flag for customers with negative account balances
+UPDATE Transactions
+SET IsHighRisk = CASE
+    WHEN CustAccountBalance < 0 THEN TRUE
+    ELSE FALSE
+END;
+
+
+-- Monthly Transaction Count and Revenue: Useful for trend analysis
+SELECT
+    YEAR(TransactionDate) AS TransactionYear,
+    MONTH(TransactionDate) AS TransactionMonth,
+    COUNT(*) AS MonthlyTransactionCount,
+    SUM(TransactionAmount) AS MonthlyRevenue
+FROM Transactions
+WHERE TransactionDate IS NOT NULL -- Ensure valid dates
+GROUP BY TransactionYear, TransactionMonth
+ORDER BY TransactionYear, TransactionMonth;
+
+
+-- Calculate repeated customers: Tracking customers who made more than one transaction
+SELECT
+    CustomerID,
+    COUNT(*) AS TransactionCount,
+    CASE
+        WHEN COUNT(*) > 1 THEN 'Repeat Customer'
+        ELSE 'One-Time Customer'
+    END AS CustomerType
+FROM Transactions
+GROUP BY CustomerID;
+
+
+-- Peak Transaction Hours: Identify times of day with the highest activity
+SELECT
+    HOUR(TransactionTime) AS TransactionHour,
+    COUNT(*) AS TransactionsCount,
+    SUM(TransactionAmount) AS TotalRevenue
+FROM Transactions
+GROUP BY TransactionHour
+ORDER BY TransactionsCount DESC;
+
 
 -- STEP:3 EXPLORATORY DATA ANALYSIS 
---1. Analyzing Transactions per Customer 
+
 -- Get the total number of transactions for each customer
 SELECT CustomerID, COUNT(*) AS TotalTransactions
 FROM Transactions
 GROUP BY CustomerID
 ORDER BY TotalTransactions DESC;
 
---2. Gender-wise Spending Analysis
 -- Calculate the average transaction amount by gender
 SELECT CustGender, AVG(TransactionAmount) AS AvgTransactionAmount
 FROM Transactions
+WHERE CustGender IS NOT NULL -- Avoid null values
 GROUP BY CustGender;
 
---3. Top Revenue Generating Locations 
--- Identify top locations by total revenue
-SELECT CustLocation, SUM(TransactionAmount) AS TotalRevenue
+-- Analyzing transaction behavior by age (Transaction frequency across age groups)
+SELECT
+    AgeGroup,
+    COUNT(*) AS TransactionsCount,
+    AVG(TransactionAmount) AS AvgTransactionAmount
+FROM Transactions
+GROUP BY AgeGroup
+ORDER BY TransactionsCount DESC;
+
+-- Identifying the top 5 revenue generating locations
+SELECT
+    CustLocation,
+    SUM(TransactionAmount) AS TotalRevenue
 FROM Transactions
 GROUP BY CustLocation
 ORDER BY TotalRevenue DESC
+LIMIT 5;
+
+-- Revenue breakdown by gender and location
+SELECT
+    CustGender,
+    CustLocation,
+    SUM(TransactionAmount) AS TotalRevenue,
+    COUNT(*) AS TransactionsCount
+FROM Transactions
+WHERE CustGender IS NOT NULL AND CustLocation IS NOT NULL
+GROUP BY CustGender, CustLocation
+ORDER BY TotalRevenue DESC;
+
+
+-- STEP4: KEY METRICS EVALUATION
+
+-- Revenue per Customer 
+SELECT
+    CustomerID,
+    SUM(TransactionAmount) AS TotalRevenuePerCustomer,
+    AVG(TransactionAmount) AS AvgTransactionPerCustomer
+FROM Transactions
+GROUP BY CustomerID
+ORDER BY TotalRevenuePerCustomer DESC;
+
+-- Identify the Top 10 high spenders  
+SELECT
+    CustomerID,
+    SUM(TransactionAmount) AS TotalSpend
+FROM Transactions
+GROUP BY CustomerID
+ORDER BY TotalSpend DESC
 LIMIT 10;
 
+-- Calculate Retention Rate: Who made transactions in consecutive years
+WITH YearlyTransactions AS (
+    SELECT
+        CustomerID,
+        YEAR(TransactionDate) AS TransactionYear
+    FROM Transactions
+    WHERE TransactionDate IS NOT NULL -- Ensure valid dates
+    GROUP BY CustomerID, TransactionYear
+)
+SELECT
+    yt1.TransactionYear AS Year,
+    COUNT(DISTINCT yt1.CustomerID) AS ActiveCustomers,
+    COUNT(DISTINCT yt2.CustomerID) AS RetainedCustomers,
+    COUNT(DISTINCT yt2.CustomerID) * 100.0 / COUNT(DISTINCT yt1.CustomerID) AS RetentionRate
+FROM YearlyTransactions yt1
+LEFT JOIN YearlyTransactions yt2
+ON yt1.CustomerID = yt2.CustomerID AND yt1.TransactionYear = yt2.TransactionYear - 1
+GROUP BY yt1.TransactionYear;
 
---STEP4: KEY METRICS EVALUATION
---1. Customer Life Time Value (CLTV)
--- Calculate CLTV using total spend and customer lifespan
+
+-- Calculate Customer Life Time Value (CLTV) using total spend and customer lifespan
 SELECT
     CustomerID,
     SUM(TransactionAmount) AS TotalSpend, -- Total amount spent by the customer
     COUNT(*) AS TotalTransactions, -- Total number of transactions
-    AVG(DATEDIFF(MAX(TransactionDate), MIN(TransactionDate))) AS CustomerLifespan, -- Average lifespan of a customer
-    SUM(TransactionAmount) * AVG(DATEDIFF(MAX(TransactionDate), MIN(TransactionDate))) AS CLTV -- CLTV estimate
+    DATEDIFF(MAX(TransactionDate), MIN(TransactionDate)) AS CustomerLifespan, -- Lifespan of a customer
+    SUM(TransactionAmount) / GREATEST(DATEDIFF(MAX(TransactionDate), MIN(TransactionDate)), 1) AS CLTV -- Avoid divide by zero
 FROM Transactions
 GROUP BY CustomerID;
 
---2. Average Order Value (AOV)
--- Calculate the average order value
+-- Calculate the average order value (AOV) 
 SELECT
     AVG(TransactionAmount) AS AOV -- Average value of a transaction
 FROM Transactions;
 
 
---STEP 5: ENHANCED SEGMENTATION
---1. Behavior based Segmentation 
--- Segment customers based on Recency, Frequency, and Spend
-WITH Behavior AS (
+
+--STEP 5: SEGMENTATION ANALYSIS
+--RFM (Recency, Frequency, Monetary) with Quantile Scores
+WITH RFM AS (
     SELECT
         CustomerID,
-        COUNT(*) AS TransactionCount, -- Total transactions per customer
-        SUM(TransactionAmount) AS TotalSpend, -- Total spend per customer
-        DATEDIFF(CURDATE(), MAX(TransactionDate)) AS Recency -- Days since last transaction
+        DATEDIFF(CURDATE(), MAX(TransactionDate)) AS Recency,
+        COUNT(*) AS Frequency,
+        SUM(TransactionAmount) AS Monetary
     FROM Transactions
     GROUP BY CustomerID
+),
+RFM_Scores AS (
+    SELECT
+        CustomerID,
+        NTILE(4) OVER (ORDER BY Recency) AS RecencyScore,
+        NTILE(4) OVER (ORDER BY Frequency DESC) AS FrequencyScore,
+        NTILE(4) OVER (ORDER BY Monetary DESC) AS MonetaryScore
+    FROM RFM
 )
 SELECT
     CustomerID,
-    CASE
-        WHEN Recency <= 30 THEN 'Recent' -- Segment customers based on recency
-        WHEN Recency <= 180 THEN 'Active'
-        ELSE 'Lapsed'
-    END AS RecencySegment,
-    CASE
-        WHEN TransactionCount >= 20 THEN 'Frequent' -- Segment customers based on frequency
-        WHEN TransactionCount >= 10 THEN 'Moderate'
-        ELSE 'Infrequent'
-    END AS FrequencySegment,
-    CASE
-        WHEN TotalSpend >= 100000 THEN 'High-Spender' -- Segment customers based on spending
-        WHEN TotalSpend >= 50000 THEN 'Medium-Spender'
-        ELSE 'Low-Spender'
-    END AS SpendSegment
-FROM Behavior;
+    RecencyScore,
+    FrequencyScore,
+    MonetaryScore,
+    CONCAT(RecencyScore, FrequencyScore, MonetaryScore) AS RFMScore
+FROM RFM_Scores
+ORDER BY RFMScore DESC;
 
---2.Seasonality Analysis:
--- Analyze transaction patterns by month
+--Customer Type Based on RFM Score:
 SELECT
-    MONTH(TransactionDate) AS TransactionMonth, -- Extract month from the date
-    COUNT(*) AS TransactionsCount, -- Count transactions per month
-    SUM(TransactionAmount) AS TotalRevenue -- Total revenue per month
+    CustomerID,
+    CASE
+        WHEN RecencyScore = 4 AND FrequencyScore = 4 AND MonetaryScore = 4 THEN 'VIP Customer'
+        WHEN RecencyScore >= 3 AND FrequencyScore >= 3 THEN 'Loyal Customer'
+        WHEN RecencyScore = 1 AND FrequencyScore = 1 THEN 'At Risk'
+        ELSE 'Regular Customer'
+    END AS CustomerType
+FROM RFM_Scores;
+
+-- Customer Segmentation by Lifetime Revenue
+SELECT
+    CustomerID,
+    SUM(TransactionAmount) AS LifetimeRevenue,
+    CASE
+        WHEN SUM(TransactionAmount) >= 100000 THEN 'Platinum'
+        WHEN SUM(TransactionAmount) BETWEEN 50000 AND 99999 THEN 'Gold'
+        WHEN SUM(TransactionAmount) BETWEEN 10000 AND 49999 THEN 'Silver'
+        ELSE 'Bronze'
+    END AS RevenueSegment
 FROM Transactions
-GROUP BY TransactionMonth
-ORDER BY TransactionMonth;
-
-
-
+GROUP BY CustomerID;
