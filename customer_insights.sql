@@ -13,6 +13,7 @@ CREATE TABLE Transactions (
     TransactionAmount DECIMAL(15, 2) -- Transaction amount in INR
 );
 
+
 -- DATA CLEANING (Performed in Microsoft Excel)
 -- Insert cleaned data into the Transactions table from RawTransactions
 INSERT INTO Transactions
@@ -34,14 +35,15 @@ FROM RawTransactions
 WHERE CustomerID IS NOT NULL; -- Exclude records without CustomerID
 
 
--- STEP2: DATA PROCESSING
 
+-- STEP2: DATA PROCESSING
 -- Add a column for customer age
 ALTER TABLE Transactions ADD COLUMN CustomerAge INT;
 -- Update age based on date of birth
 UPDATE Transactions
 SET CustomerAge = TIMESTAMPDIFF(YEAR, CustomerDOB, CURDATE())
 WHERE CustomerDOB IS NOT NULL; -- Ensure DOB is non-null
+
 
 -- Categorize customers into age groups for segmentation
 ALTER TABLE Transactions ADD COLUMN AgeGroup VARCHAR(20);
@@ -56,12 +58,14 @@ SET AgeGroup = CASE
     ELSE 'Unknown'
 END;
 
+
 -- Add a column for the year of the transaction
 ALTER TABLE Transactions ADD COLUMN TransactionYear INT;
 -- Update the year field using the transaction date
 UPDATE Transactions
 SET TransactionYear = YEAR(TransactionDate)
 WHERE TransactionDate IS NOT NULL;
+
 
 -- Identify High-Risk Customers (Negative Balances): Tag customers with negative balances for further investigation
 -- Add a column to flag high-risk customers
@@ -72,6 +76,55 @@ SET IsHighRisk = CASE
     WHEN CustAccountBalance < 0 THEN TRUE
     ELSE FALSE
 END;
+
+
+
+
+-- STEP:3 EXPLORATORY DATA ANALYSIS 
+-- Get the total number of transactions for each customer
+SELECT CustomerID, COUNT(*) AS TotalTransactions
+FROM Transactions
+GROUP BY CustomerID
+ORDER BY TotalTransactions DESC;
+
+
+-- Calculate the average transaction amount by gender
+SELECT CustGender, AVG(TransactionAmount) AS AvgTransactionAmount
+FROM Transactions
+WHERE CustGender IS NOT NULL -- Avoid null values
+GROUP BY CustGender;
+
+
+-- Analyzing transaction behavior by age (Transaction frequency across age groups)
+SELECT
+    AgeGroup,
+    COUNT(*) AS TransactionsCount,
+    AVG(TransactionAmount) AS AvgTransactionAmount
+FROM Transactions
+GROUP BY AgeGroup
+ORDER BY TransactionsCount DESC;
+
+
+-- Identifying the top 5 revenue generating locations
+SELECT
+    CustLocation,
+    SUM(TransactionAmount) AS TotalRevenue
+FROM Transactions
+GROUP BY CustLocation
+ORDER BY TotalRevenue DESC
+LIMIT 5;
+
+
+-- Revenue breakdown by gender and location
+SELECT
+    CustGender,
+    CustLocation,
+    SUM(TransactionAmount) AS TotalRevenue,
+    COUNT(*) AS TransactionsCount
+FROM Transactions
+WHERE CustGender IS NOT NULL AND CustLocation IS NOT NULL
+GROUP BY CustGender, CustLocation
+ORDER BY TotalRevenue DESC;
 
 
 -- Monthly Transaction Count and Revenue: Useful for trend analysis
@@ -108,52 +161,9 @@ GROUP BY TransactionHour
 ORDER BY TransactionsCount DESC;
 
 
--- STEP:3 EXPLORATORY DATA ANALYSIS 
-
--- Get the total number of transactions for each customer
-SELECT CustomerID, COUNT(*) AS TotalTransactions
-FROM Transactions
-GROUP BY CustomerID
-ORDER BY TotalTransactions DESC;
-
--- Calculate the average transaction amount by gender
-SELECT CustGender, AVG(TransactionAmount) AS AvgTransactionAmount
-FROM Transactions
-WHERE CustGender IS NOT NULL -- Avoid null values
-GROUP BY CustGender;
-
--- Analyzing transaction behavior by age (Transaction frequency across age groups)
-SELECT
-    AgeGroup,
-    COUNT(*) AS TransactionsCount,
-    AVG(TransactionAmount) AS AvgTransactionAmount
-FROM Transactions
-GROUP BY AgeGroup
-ORDER BY TransactionsCount DESC;
-
--- Identifying the top 5 revenue generating locations
-SELECT
-    CustLocation,
-    SUM(TransactionAmount) AS TotalRevenue
-FROM Transactions
-GROUP BY CustLocation
-ORDER BY TotalRevenue DESC
-LIMIT 5;
-
--- Revenue breakdown by gender and location
-SELECT
-    CustGender,
-    CustLocation,
-    SUM(TransactionAmount) AS TotalRevenue,
-    COUNT(*) AS TransactionsCount
-FROM Transactions
-WHERE CustGender IS NOT NULL AND CustLocation IS NOT NULL
-GROUP BY CustGender, CustLocation
-ORDER BY TotalRevenue DESC;
 
 
 -- STEP4: KEY METRICS EVALUATION
-
 -- Revenue per Customer 
 SELECT
     CustomerID,
@@ -163,6 +173,7 @@ FROM Transactions
 GROUP BY CustomerID
 ORDER BY TotalRevenuePerCustomer DESC;
 
+
 -- Identify the Top 10 high spenders  
 SELECT
     CustomerID,
@@ -171,6 +182,7 @@ FROM Transactions
 GROUP BY CustomerID
 ORDER BY TotalSpend DESC
 LIMIT 10;
+
 
 -- Calculate Retention Rate: Who made transactions in consecutive years
 WITH YearlyTransactions AS (
@@ -201,6 +213,7 @@ SELECT
     SUM(TransactionAmount) / GREATEST(DATEDIFF(MAX(TransactionDate), MIN(TransactionDate)), 1) AS CLTV -- Avoid divide by zero
 FROM Transactions
 GROUP BY CustomerID;
+
 
 -- Calculate the average order value (AOV) 
 SELECT
@@ -237,6 +250,7 @@ SELECT
 FROM RFM_Scores
 ORDER BY RFMScore DESC;
 
+
 --Customer Type Based on RFM Score:
 SELECT
     CustomerID,
@@ -247,6 +261,7 @@ SELECT
         ELSE 'Regular Customer'
     END AS CustomerType
 FROM RFM_Scores;
+
 
 -- Customer Segmentation by Lifetime Revenue
 SELECT
