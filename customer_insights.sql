@@ -1,5 +1,4 @@
 --Step1: DATA PREPARATION 
-
 -- Schema Creation 
 -- Create the Transactions table with the necessary fields
 CREATE TABLE Transactions (
