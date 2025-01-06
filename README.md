@@ -21,7 +21,7 @@ The SQL implementation aims to address these challenges by:
 ## Customer Segmentation:  
 - Implementing RFM (Recency, Frequency, Monetary) analysis to segment customers based on their recent activity, transaction frequency, and spending behavior.
 - Segmenting customers based on lifetime revenue to identify high-value customers (Platinum, Gold, Silver, Bronze).
-- Benefits of the Solution:
+
 
 # Benifits of the Solution
 **Improved Customer Targeting:** By understanding customer segments, the company can tailor marketing campaigns and product offerings to specific customer needs and preferences, increasing the effectiveness of marketing spend.
