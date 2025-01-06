@@ -23,8 +23,8 @@ The SQL implementation aims to address these challenges by:
 - Segmenting customers based on lifetime revenue to identify high-value customers (Platinum, Gold, Silver, Bronze).
 
 
-# Benifits of the Solution
-**Improved Customer Targeting:** By understanding customer segments, the company can tailor marketing campaigns and product offerings to specific customer needs and preferences, increasing the effectiveness of marketing spend.
-**Enhanced Customer Retention:** Identifying at-risk customers allows the company to proactively implement retention strategies such as loyalty programs, personalized offers, and improved customer service.
-**Increased customer Lifetime Value (CLTV):** By focusing on high-value customers and understanding their behavior, the company can maximize customer lifetime value through targeted campaigns and personalized experiences.
-**Data-Driven Decision Making:** The insights gained from the analysis can inform key business decisions, such as product development, pricing strategies, and resource allocation.
+# Benifits of the Solution  
+**Improved Customer Targeting:** By understanding customer segments, the company can tailor marketing campaigns and product offerings to specific customer needs and preferences, increasing the effectiveness of marketing spend.  
+**Enhanced Customer Retention:** Identifying at-risk customers allows the company to proactively implement retention strategies such as loyalty programs, personalized offers, and improved customer service.  
+**Increased customer Lifetime Value (CLTV):** By focusing on high-value customers and understanding their behavior, the company can maximize customer lifetime value through targeted campaigns and personalized experiences.  
+**Data-Driven Decision Making:** The insights gained from the analysis can inform key business decisions, such as product development, pricing strategies, and resource allocation.  
