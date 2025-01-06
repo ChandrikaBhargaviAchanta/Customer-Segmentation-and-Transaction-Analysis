@@ -1,5 +1,5 @@
 # Business Problem  
-The company is facing challenges in understanding and maximizing customer value. They require a deeper understanding of customer behavior, preferences, and profitability to improve marketing strategies, enhance customer retention, and optimize revenue generation.
+The Fintech company is facing challenges in understanding and maximizing customer value. They require a deeper understanding of customer behavior, preferences, and profitability to improve marketing strategies, enhance customer retention, and optimize revenue generation.
 
 # Key Business Challenges:  
 **Lack of Customer Segmentation:** The company lacks a clear understanding of different customer segments and their unique needs and behaviors. This hinders targeted marketing efforts and personalized customer experiences.  
